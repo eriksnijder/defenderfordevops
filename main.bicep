@@ -1,33 +1,44 @@
-@minLength(3)
-@maxLength(11)
-param storagePrefix string
+@description('Base name of the resource such as web app name and app service plan ')
+@minLength(2)
+param webAppName string = 'AzureLinuxApp'
 
-@allowed([
-  'Standard_LRS'
-  'Standard_GRS'
-  'Standard_RAGRS'
-  'Standard_ZRS'
-  'Premium_LRS'
-  'Premium_ZRS'
-  'Standard_GZRS'
-  'Standard_RAGZRS'
-])
-param storageSKU string = 'Standard_LRS'
+@description('The SKU of App Service Plan ')
+param sku string = 'S1'
 
+@description('The Runtime stack of current web app')
+param linuxFxVersion string = 'php|7.4'
+
+@description('Location for all resources.')
 param location string = resourceGroup().location
 
-var uniqueStorageName = '${storagePrefix}${uniqueString(resourceGroup().id)}'
+var webAppPortalName = '${webAppName}-webapp'
+var appServicePlanName = 'AppServicePlan-${webAppName}'
 
-resource stg 'Microsoft.Storage/storageAccounts@2021-04-01' = {
-  name: uniqueStorageName
+resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
+  name: appServicePlanName
   location: location
   sku: {
-    name: storageSKU
+    name: sku
   }
-  kind: 'StorageV2'
+  kind: 'linux'
   properties: {
-    supportsHttpsTrafficOnly: true
+    reserved: true
   }
 }
 
-output storageEndpoint object = stg.properties.primaryEndpoints
+resource webAppPortal 'Microsoft.Web/sites@2022-03-01' = {
+  name: webAppPortalName
+  location: location
+  kind: 'app'
+  properties: {
+    serverFarmId: appServicePlan.id
+    siteConfig: {
+      linuxFxVersion: linuxFxVersion
+      ftpsState: 'FtpsOnly'
+    }
+    httpsOnly: true
+  }
+  identity: {
+    type: 'SystemAssigned'
+  }
+}
